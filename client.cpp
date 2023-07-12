@@ -12,7 +12,7 @@ using namespace std;
 bool flagSaida = false;
 int socketCliente;
 void tratarControlC(int signal);
-int apagarTexto(int cnt);
+void apagarTexto(int cnt);
 void enviarMensagem(int socketCliente);
 void receberMensagem(int socketCliente);
 thread tEnviar, tReceber;
@@ -26,6 +26,7 @@ int main() {
     struct sockaddr_in client;
 	client.sin_family=AF_INET;
 	client.sin_port=htons(9000); //Servidor na porta 9000 
+	client.sin_addr.s_addr=INADDR_ANY;
 	bzero(&client.sin_zero,0);
 
     // tenta conectar o socket cliente a um endereco se estiver em read mode
@@ -41,7 +42,7 @@ int main() {
 	cin.getline(nome, MAX_MSG);
     send(socketCliente, nome, sizeof(nome), 0); //envia uma mensagem com o nome
 
-    cout<<"\n\t  ====== Bem vindo ao chat ======   "<<endl;
+    cout<<"\n\t  ====== Bem vindo ao chat ======   " << endl;
 
     // criacao de duas threads, para realizar o recebimento e envio de msgs, coloca na variavel global e se junta a elas se possivel
     thread t1(enviarMensagem, socketCliente);
@@ -84,14 +85,14 @@ void receberMensagem(int socketCliente) {
 
         // recebe a msg e trata ela
 		recv(socketCliente, str, sizeof(str), 0);
-		apagarTexto(6);
+		// apagarTexto(6);
         
         // imprime as msgs como suas ou do outro usuario 
 		if(strcmp(nome,"#NULL")!=0)
-			cout << nome <<" : " << str <<endl;
+			cout << nome << ": " << str <<endl;
 		else
 			cout << str << endl;
-		cout << "Voce : ";
+		cout << "Voce: ";
 		fflush(stdout);
 	}
 }
@@ -100,14 +101,14 @@ void tratarControlC(int signal) {
     char str[MAX_MSG] = "#exit";
 	send(socketCliente, str, sizeof(str), 0);
 	flagSaida = true;
-	tReceber.detach();
 	tEnviar.detach();
+	tReceber.detach();
 	close(socketCliente);
 	exit(signal);
 }
 
-//apaga n bytes
-int apagarTexto(int cnt) {
+// apaga n bytes
+void apagarTexto(int cnt) {
     char tamanho = 8;
 	for(int i = 0; i < cnt; i++){
 		cout << tamanho;

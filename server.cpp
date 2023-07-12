@@ -22,52 +22,6 @@ int seed = 0;
 vector<terminal> clients;
 mutex clients_mtx, cout_mtx;
 
-int main() {
-    int server_socket;
-    if ((server_socket = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
-        perror("socket error: ");
-        exit(-1);
-    }
-
-    struct sockaddr_in server;
-    server.sin_family = AF_INET;
-    server.sin_port = htons(9000);
-    server.sin_addr.s_addr = INADDR_ANY;
-    bzero(&server.sin_zero, 0);
-
-    if ((bind(server_socket, (struct sockaddr *)&server, sizeof(struct sockaddr_in))) == -1) {
-        perror("bind error: ");
-        exit(-1);
-    }
-
-    if ((listen(server_socket, 8)) == -1) {
-        perror("listen error: ");
-        exit(-1);
-    }
-    
-    int client_socket;
-    struct sockaddr_in client;
-    unsigned int len = sizeof(sockaddr_in);
-
-    cout << "==== Bem vindo ao chatroom ====" << endl;
-
-    while (1) {
-        if ((client_socket = accept(server_socket, (struct sockaddr *)&client, &len)) == -1) {
-            perror("accept error: ");
-            exit(-1);
-        }
-
-        seed++;
-        thread t(handle_client, client_socket, seed);
-        lock_guard<mutex> guard(clients_mtx);
-        clients.push_back({seed, string("Anonymous"), client_socket, (move(t))});
-    }
-
-    close(server_socket);
-
-    return EXIT_SUCCESS;
-}
-
 void set_name(int id, char name[]) {
     for (auto &client : clients) {
         if (client.id == id) {
@@ -76,7 +30,7 @@ void set_name(int id, char name[]) {
     }
 }
 
-int broadcast(string msg, int sender_id) {
+void broadcast(string msg, int sender_id) {
     char tmp[MAX_LEN];
     strcpy(tmp, msg.c_str());
 
@@ -87,7 +41,7 @@ int broadcast(string msg, int sender_id) {
     }
 }
 
-int broadcast(int num, int sender_id) {
+void broadcast(int num, int sender_id) {
     for (auto &client : clients) {
         if (client.id != sender_id) {
             send(client.socket, &num, sizeof(num), 0);
@@ -141,6 +95,57 @@ void handle_client(int client_socket, int id) {
         broadcast(string(name), id);
         broadcast(id, id);
         broadcast(string(str), id);
-        shared_print(id + name + string(":") + str);
+        shared_print(name + string(":") + str);
+        // shared_print(id + name + string(":") + str);
     }
+}
+
+int main() {
+    int server_socket;
+    if ((server_socket = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
+        perror("socket error: ");
+        exit(-1);
+    }
+
+    struct sockaddr_in server;
+    server.sin_family = AF_INET;
+    server.sin_port = htons(9000);
+    server.sin_addr.s_addr = INADDR_ANY;
+    bzero(&server.sin_zero, 0);
+
+    if ((bind(server_socket, (struct sockaddr *)&server, sizeof(struct sockaddr_in))) == -1) {
+        perror("bind error: ");
+        exit(-1);
+    }
+
+    if ((listen(server_socket, 8)) == -1) {
+        perror("listen error: ");
+        exit(-1);
+    }
+    
+    int client_socket;
+    struct sockaddr_in client;
+    unsigned int len = sizeof(sockaddr_in);
+
+    cout << "==== Bem vindo ao chatroom ====" << endl;
+
+    while (1) {
+        if ((client_socket = accept(server_socket, (struct sockaddr *)&client, &len)) == -1) {
+            perror("accept error: ");
+            exit(-1);
+        }
+
+        seed++;
+        thread t(handle_client, client_socket, seed);
+        lock_guard<mutex> guard(clients_mtx);
+        clients.push_back({seed, string("Anonymous"), client_socket, (move(t))});
+    }
+
+    for (auto &client : clients) {
+        client.th.join();
+    }
+
+    close(server_socket);
+
+    return EXIT_SUCCESS;
 }
