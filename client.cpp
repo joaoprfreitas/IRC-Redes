@@ -8,7 +8,7 @@
 
 using namespace std;
 
-#define MAX_MSG 200
+#define MAX_MSG 4096
 
 bool flagSaida = false;
 int socketCliente;

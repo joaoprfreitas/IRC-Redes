@@ -6,5 +6,8 @@ server:
 	rm -f server
 	g++ server.cpp -lpthread -o server
 
+clean:
+	rm -f client server
+
 all: client server
 	./server

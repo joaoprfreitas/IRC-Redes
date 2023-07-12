@@ -9,7 +9,7 @@
 
 using namespace std;
 
-#define MAX_LEN 200
+#define MAX_LEN 4096
 
 struct terminal {
 	int id;
