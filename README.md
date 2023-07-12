@@ -2,7 +2,7 @@
 
 Membros:\
 Gabriel Akio Urakawa - 11795912\
-Joao\
+João Pedro Rodrigues Freitas - 11316552\
 Samuel
 
 Link para o video: \
