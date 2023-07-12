@@ -2,6 +2,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <string.h>
+#include <unistd.h>
 #include <signal.h>
 #include <thread>
 
@@ -85,13 +86,13 @@ void receberMensagem(int socketCliente) {
 
         // recebe a msg e trata ela
 		recv(socketCliente, str, sizeof(str), 0);
-		// apagarTexto(6);
+		apagarTexto(6); //apaga "Voce: "
         
         // imprime as msgs como suas ou do outro usuario 
-		if(strcmp(nome,"#NULL")!=0)
-			cout << nome << ": " << str <<endl;
-		else
+		if(strcmp(nome,"#NULL")!=0) cout << nome << ": " << str <<endl;
+		else{
 			cout << str << endl;
+		}
 		cout << "Voce: ";
 		fflush(stdout);
 	}
@@ -107,7 +108,6 @@ void tratarControlC(int signal) {
 	exit(signal);
 }
 
-// apaga n bytes
 void apagarTexto(int cnt) {
     char tamanho = 8;
 	for(int i = 0; i < cnt; i++){

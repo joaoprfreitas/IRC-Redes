@@ -74,7 +74,7 @@ void handle_client(int client_socket, int id) {
 
     string welcome_message = string(name) + string(" entrou no chat!");
     broadcast("#NULL", id);
-    broadcast(id, id);
+    // broadcast(id, id);
     broadcast(welcome_message, id);
     shared_print(welcome_message);
 
@@ -85,7 +85,7 @@ void handle_client(int client_socket, int id) {
         if (strcmp(str, "#exit") == 0) {
             string msg = string(name) + string(" saiu do chat!");
             broadcast("#NULL", id);
-            broadcast(id, id);
+            // broadcast(id, id);
             broadcast(msg, id);
             shared_print(msg);
             end_connection(id);
@@ -93,7 +93,7 @@ void handle_client(int client_socket, int id) {
         }
 
         broadcast(string(name), id);
-        broadcast(id, id);
+        // broadcast(id, id);
         broadcast(string(str), id);
         shared_print(name + string(":") + str);
         // shared_print(id + name + string(":") + str);

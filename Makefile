@@ -5,3 +5,6 @@ client:
 server:
 	rm -f server
 	g++ server.cpp -lpthread -o server
+
+all: client server
+	./server
