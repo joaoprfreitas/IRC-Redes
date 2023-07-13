@@ -98,7 +98,6 @@ void handle_client(int client_socket, int id) {
         if (strcmp(str, "/quit") == 0) {
             string msg = string(name) + string(" saiu do chat!");
             broadcast("#NULL", id);
-            // broadcast(id, id);
             broadcast(msg, id);
             shared_print(msg);
             end_connection(id);
@@ -109,7 +108,6 @@ void handle_client(int client_socket, int id) {
             messageToUser(string("pong"), id);
         } else {
             broadcast(string(name), id);
-            // broadcast(id, id);
             broadcast(string(str), id);
             shared_print(name + string(": ") + str);
         }

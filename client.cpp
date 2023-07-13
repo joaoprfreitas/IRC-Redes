@@ -22,15 +22,15 @@ void receberMensagem(int socketCliente);
 thread tEnviar, tReceber;
 
 int main() {
-    if ((socketCliente = socket(AF_INET,SOCK_STREAM,0)) == -1) {
+    if ((socketCliente = socket(AF_INET,SOCK_STREAM, 0)) == -1) {
 		cout << "[Error] Socket não pode ser criado, tente novamente!" << endl;
 		return EXIT_FAILURE;
 	}
 	
     struct sockaddr_in client;
-	client.sin_family=AF_INET;
-	client.sin_port=htons(PORT); //Servidor na porta 9000 
-	client.sin_addr.s_addr=INADDR_ANY;
+	client.sin_family = AF_INET;
+	client.sin_port = htons(PORT);
+	client.sin_addr.s_addr = INADDR_ANY;
 	bzero(&client.sin_zero, 0);
 
 	string conexao;
