@@ -1,11 +1,8 @@
 Modulo 1
--- Bloco max deve ser 4096, se for maior, dividir em blocos de 4096
+-- ver pq bloco max (string) n passa de 4095
 
 Modulo 2
--- /quit
 -- ctrl + d
--- /connect
--- /ping
 -- checar se clientes receberam as msgs, se não, reenviar. após 5 falhas, desconectar
 -- tratar deadlocks
 -- tratar ctrl + c
