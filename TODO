@@ -2,10 +2,8 @@ Modulo 1
 -- ver pq bloco max (string) n passa de 4095
 
 Modulo 2
--- ctrl + d
 -- checar se clientes receberam as msgs, se não, reenviar. após 5 falhas, desconectar
 -- tratar deadlocks
--- tratar ctrl + c
 
 Modulo 3
 -- sistema de canais

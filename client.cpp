@@ -15,15 +15,17 @@ using namespace std;
 
 bool flagSaida = false;
 int socketCliente;
-void tratarControlC(int signal);
-void apagarTexto(int cnt);
-void enviarMensagem(int socketCliente);
-void receberMensagem(int socketCliente);
 thread tEnviar, tReceber;
 
+void tratarControlC(int signal);
+void apagarTexto(int n);
+void enviarMensagem(int socketCliente);
+void receberMensagem(int socketCliente);
+
 int main() {
+	// Criação do socket
     if ((socketCliente = socket(AF_INET,SOCK_STREAM, 0)) == -1) {
-		cout << "[Error] Socket não pode ser criado, tente novamente!" << endl;
+		cout << "[Error] Erro na criação do socket, tente novamente!" << endl;
 		return EXIT_FAILURE;
 	}
 	
@@ -37,7 +39,7 @@ int main() {
 	cout << "Digite /connect para se conectar ao servidor ou /quit para sair" << endl;
 	getline(cin, conexao);
 
-	if (conexao == "/quit") {
+	if (conexao == "/quit" || cin.eof()) {
 		cout << "Cliente encerrado!" << endl;
 		flagSaida = true;
 		close(socketCliente);
@@ -51,24 +53,26 @@ int main() {
 		return EXIT_SUCCESS;
 	}
 
-    // tenta conectar o socket cliente a um endereco se estiver em read mode
-    if ((connect(socketCliente,(struct sockaddr *)&client,sizeof(struct sockaddr_in))) == -1) {
-		cout << "[Error] Conexão com o servidor não estabelecida, tente novamente!" << endl;
+    // Conecta ao servidor
+    if ((connect(socketCliente, (struct sockaddr *)&client, sizeof(struct sockaddr_in))) == -1) {
+		cout << "[Error] Bind falhou, tente novamente!" << endl;
 		return EXIT_FAILURE;
 	}
 
-    signal(SIGINT, tratarControlC); //tratamento do control + c para parar o chat
+    signal(SIGINT, tratarControlC); // Captura do ctrl + c
 
 	char nome[MAX_MSG];
 	cout << "Digite seu nome: ";
 	cin.getline(nome, MAX_MSG);
 	send(socketCliente, nome, sizeof(nome), 0); //envia uma mensagem com o nome
 
-	cout << "\n\t  ====== Bem vindo ao chat ======   " << endl;
+	cout << "\n====== Bem vindo ao chat ======   " << endl;
 
-	// criacao de duas threads, para realizar o recebimento e envio de msgs, coloca na variavel global e se junta a elas se possivel
+	// Criação de duas threads, para realizar o recebimento e envio de msgs
+	// Coloca as threads criadas em variáveis globais
 	thread t1(enviarMensagem, socketCliente);
 	thread t2(receberMensagem, socketCliente);
+
 	tEnviar = move(t1);
 	tReceber = move(t2);
 
@@ -78,6 +82,7 @@ int main() {
     return EXIT_SUCCESS;
 }
 
+// Realiza a quebra da mensagem em blocos de 4096 bytes
 vector<char *> comporBlocos(string msg) {
 	vector<char *> blocos;
 
@@ -103,43 +108,49 @@ vector<char *> comporBlocos(string msg) {
 	return blocos;
 }
 
-// leitura e envio de n mensagens ate receber o control+c
+// Envia as mensagens do cliente para o servidor por meio do socket
 void enviarMensagem(int socketCliente) {
     while(true) {
         cout << "Voce: ";
 		string msg;
 		getline(cin, msg, '\n');
 
+		// Em caso de quit ou ctrl + d, encerra o chat
+		if (msg == "/quit" || cin.eof()) {
+			send(socketCliente, "/quit", 5, 0);
+			flagSaida = true;
+			// tReceber.detach();
+			tEnviar.detach();
+			close(socketCliente);
+			return;
+		}
+
+		// Envia a mensagem em blocos de 4kb para o servidor
 		vector<char *> blocos = comporBlocos(msg);
 
 		for (char *bloco : blocos) {
 			send(socketCliente, bloco, strlen(bloco), 0);
 		}
-
-        // recebe o control+c
-		if (msg == "/quit") {
-			flagSaida = true;
-			tReceber.detach();	
-			close(socketCliente);
-			return;
-		}
     }
 }
 
-// recebe a msg de outro usuario
+// Recebe as mensagens do servidor
 void receberMensagem(int socketCliente) {
     while(true) {
         // caso nao devesse receber msg, cancela
-		if(flagSaida) return;
+		if (flagSaida) return;
+
 		char nome[MAX_MSG], str[MAX_MSG];
         
-        // recebe o nome e confere se foi enviado um nome com tamanho nao nulo
+        // Recebe o nome de quem enviou a msg, verificando o tamanho
 		int bytes_received = recv(socketCliente, nome, sizeof(nome), 0);
-		if(bytes_received <= 0) continue; 
 
-        // recebe a msg e trata ela
+		// Caso nao receba nada, retorna ao inicio do loop
+		if (bytes_received <= 0) continue; 
+
+        // Recebe a msg e trata ela
 		recv(socketCliente, str, sizeof(str), 0);
-		apagarTexto(6); //apaga "Voce: "
+		apagarTexto(6); // Apaga "Voce: "
         
         // imprime as msgs como suas ou do outro usuario 
 		if (strcmp(nome, "#NULL") != 0)
@@ -152,19 +163,14 @@ void receberMensagem(int socketCliente) {
 	}
 }
 
+// Trata o ctrl + c para sair do chat
 void tratarControlC(int signal) {
-    char str[MAX_MSG] = "/quit";
-	send(socketCliente, str, sizeof(str), 0);
-	flagSaida = true;
-	tEnviar.detach();
-	tReceber.detach();
-	close(socketCliente);
-	exit(signal);
+	cout << "\nPara sair digite /quit\n";
 }
 
-void apagarTexto(int cnt) {
-    char tamanho = 8;
-	for (int i = 0; i < cnt; i++) {
-		cout << tamanho;
-	}
+// Apaga n bytes da tela
+void apagarTexto(int n) {
+    char del = 8;
+	for (int i = 0; i < n; i++)
+		cout << del;
 }
