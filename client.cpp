@@ -154,7 +154,7 @@ void enviarMensagem(int socketCliente) {
             char channel[MAX_MSG];
             strcpy(channel, msg.substr(space + 1).c_str());
 
-            if(checkChannelName(channel)){
+            if (checkChannelName(channel)){
                 send(socketCliente, channel, sizeof(channel), 0); //envia uma mensagem com o nome do canal
                 inChannel = true;
             }

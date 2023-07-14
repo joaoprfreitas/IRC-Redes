@@ -7,6 +7,9 @@ Modulo 2
 
 Modulo 3
 -- sistema de canais
+-- -- desbugar qnd alguem sai do servidor, o canal morre e crasha o server
+-- -- comandos adm
+-- -- debug pra ver se a pessoa é adm do canal msm n sendo (no server)
 -- sistema de adm do canal
 -- adm: kick, mute whois
 

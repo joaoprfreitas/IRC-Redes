@@ -39,9 +39,9 @@ void setClientName(int clientId, char name[]) {
     }
 }
 
-bool channelExists(char channel[]){
+bool channelExists(char channel[]) {
     
-    return (find(channels.begin(),channels.end(), channel) != channels.end());
+    return (find(channels.begin(), channels.end(), channel) != channels.end());
 }
 
 void createChannel(int sender_id, char channel[]){
@@ -123,7 +123,7 @@ void printTerminal(string str, bool endline = true) {
 void encerraConexaoCliente(int id) {
     for (auto it = clients.begin(); it != clients.end(); it++) {
         if (it->id == id) {
-            if(it->adm = true){
+            if (it->adm = true) {
                 string channel_closed_message = string(it->channel) + string(" foi encerrado, selecione um novo canal utilizando o comando /join novamente");
                 broadcast(channel_closed_message, id);
                 encerraCanal(it->channel);
@@ -147,6 +147,7 @@ void clientHandler(int client_socket, int id) {
 
     // Recebe o nome do canal
     recv(client_socket, channel, sizeof(channel), 0);
+    
     if(channelExists)
         setChannel(id, channel);
     else{
