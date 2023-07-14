@@ -6,7 +6,7 @@
 #include <thread>
 #include <mutex>
 #include <vector>
-#include <bits/stdc++.h>
+#include <algorithm>
 
 using namespace std;
 
@@ -18,6 +18,7 @@ struct client {
 	string name;
 	int socket;
 	thread th;
+
     string channel;
     bool adm;
     bool mute;
@@ -40,7 +41,7 @@ void setClientName(int clientId, char name[]) {
 
 bool channelExists(char channel[]){
     
-    return (std::find(channels.begin(),channels.end(), channel) != channels.end());
+    return (find(channels.begin(),channels.end(), channel) != channels.end());
 }
 
 void createChannel(int sender_id, char channel[]){
@@ -55,7 +56,7 @@ void createChannel(int sender_id, char channel[]){
 }
 
 void encerraCanal(string channel){
-    auto it = std::find(channels.begin(),channels.end(), channel);
+    auto it = find(channels.begin(),channels.end(), channel);
 
     channels.erase(it);
 }
