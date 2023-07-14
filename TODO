@@ -4,6 +4,7 @@ Modulo 1
 Modulo 2
 -- checar se clientes receberam as msgs, se não, reenviar. após 5 falhas, desconectar
 -- tratar deadlocks
+-- encerramento correto do servidor
 
 Modulo 3
 -- sistema de canais

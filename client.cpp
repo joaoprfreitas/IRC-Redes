@@ -13,7 +13,7 @@ using namespace std;
 #define MAX_MSG 4096
 #define PORT 6000
 
-bool flagSaida = false;
+bool flagSaida = false, inChannel = false;
 int socketCliente;
 thread tEnviar, tReceber;
 
@@ -21,6 +21,7 @@ void tratarControlC(int signal);
 void apagarTexto(int n);
 void enviarMensagem(int socketCliente);
 void receberMensagem(int socketCliente);
+bool checkChannelName(char channel[]);
 
 int main() {
 	// Criação do socket
@@ -61,12 +62,35 @@ int main() {
 
     signal(SIGINT, tratarControlC); // Captura do ctrl + c
 
-	char nome[MAX_MSG];
+	char nome[MAX_MSG], channel[MAX_MSG];
 	cout << "Digite seu nome: ";
 	cin.getline(nome, MAX_MSG);
 	send(socketCliente, nome, sizeof(nome), 0); //envia uma mensagem com o nome
 
-	cout << "\n====== Bem vindo ao chat ======   " << endl;
+    cout << "\n====== Conexão estabelecida ======   " << endl;
+
+    while(!inChannel){
+        cout << "Digite /join nomeCanal para entrar no canal especificado" << endl;
+
+        getline(cin, conexao, ' ');
+        cin.getline(channel, MAX_MSG);
+
+        if (conexao != "/join") {
+            cout << "Comando inválido, cliente encerrado!" << endl;
+            flagSaida = true;
+            close(socketCliente);
+            return EXIT_SUCCESS;
+        }
+
+        if(checkChannelName(channel)){
+            send(socketCliente, channel, sizeof(channel), 0); //envia uma mensagem com o nome do canal
+            inChannel = true;
+        }
+        else
+            cout << "\nNome de canal inválido \nNomes válidos de canais começam com '&' ou '#', tem tamanho máximo de 200 caracteres e não possui ' ', '^G' ou ','" << endl;
+    }
+
+	cout << "\n====== Bem vindo ao canal " << channel << " ======   " << endl;
 
 	// Criação de duas threads, para realizar o recebimento e envio de msgs
 	// Coloca as threads criadas em variáveis globais
@@ -125,6 +149,19 @@ void enviarMensagem(int socketCliente) {
 			return;
 		}
 
+        if(msg.substr(0, 5) == "/join"){
+            int space = msg.find(" ");
+            char channel[MAX_MSG];
+            strcpy(channel, msg.substr(space + 1).c_str());
+
+            if(checkChannelName(channel)){
+                send(socketCliente, channel, sizeof(channel), 0); //envia uma mensagem com o nome do canal
+                inChannel = true;
+            }
+            else
+                cout << "\nNome de canal inválido \nNomes válidos de canais começam com '&' ou '#', tem tamanho máximo de 200 caracteres e não possui ' ', '^G' ou ','" << endl;
+        }
+
 		// Envia a mensagem em blocos de 4kb para o servidor
 		vector<char *> blocos = comporBlocos(msg);
 
@@ -173,4 +210,26 @@ void apagarTexto(int n) {
     char del = 8;
 	for (int i = 0; i < n; i++)
 		cout << del;
+}
+
+bool checkChannelName(char channel[]) {
+    int length = 0;
+    while (channel[length] != '\0') {
+        if (length >= 200) {
+            return false;
+        }
+        length++;
+    }
+
+    if (length == 0 || (channel[0] != '&' && channel[0] != '#')) {
+        return false;
+    }
+
+    for (int i = 0; i < length; ++i) {
+        if (channel[i] == ' ' || channel[i] == '\a' || channel[i] == ',') {
+            return false;
+        }
+    }
+
+    return true;
 }
