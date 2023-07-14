@@ -63,8 +63,18 @@ int main() {
     signal(SIGINT, tratarControlC); // Captura do ctrl + c
 
 	char nome[MAX_MSG], channel[MAX_MSG];
-	cout << "Digite seu nome: ";
+	cout << "Digite /nickname apelidoDesejado para definir o apelido que será atribuído a você no chat ";
+
+    getline(cin, conexao, ' ');
 	cin.getline(nome, MAX_MSG);
+
+    if (conexao != "/nickname") {
+        cout << "Comando inválido, cliente encerrado!" << endl;
+        flagSaida = true;
+        close(socketCliente);
+        return EXIT_SUCCESS;
+    }
+
 	send(socketCliente, nome, sizeof(nome), 0); //envia uma mensagem com o nome
 
     cout << "\n====== Conexão estabelecida ======   " << endl;
