@@ -30,6 +30,7 @@ mutex clients_mtx, cout_mtx;
 vector<string> channels;
 
 void encerraConexaoCliente(int id);
+void messageToUser(string msg, int clientId);
 
 // Atribui um nome a um cliente com base no seu id
 void setClientName(int clientId, char name[]) {
@@ -69,7 +70,9 @@ void encerraCanal(string channel) {
 
     for (auto &client : clients) {
         if (client.channel == channel && !client.adm) {
-            encerraConexaoCliente(client.id);
+            cout << "Servidor encerrando canal de " << client.name << endl;
+            messageToUser(string("server"), client.id);
+            messageToUser(string("#closeconnection"), client.id);
         }
     }
 
@@ -120,14 +123,6 @@ void broadcast(string msg, int sender_id) {
     }
 }
 
-// void broadcast(int num, int sender_id) {
-//     for (auto &client : clients) {
-//         if (client.id != sender_id) {
-//             send(client.socket, &num, sizeof(num), 0);
-//         }
-//     }
-// }
-
 // Imprime uma msg no terminal do servidor, controlando race condition
 void printTerminal(string str, bool endline = true) {
     lock_guard<mutex> guard(cout_mtx);
@@ -140,14 +135,10 @@ void encerraConexaoCliente(int id) {
     for (auto it = clients.begin(); it != clients.end(); it++) {
         if (it->id == id) {
             if (it->adm == true) {
-                string channel_closed_message = string("O canal ") + string(it->channel) + string(" foi encerrado, sua conexão será encerrada.");
+                string channel_closed_message = string("O canal ") + string(it->channel) + string(" foi encerrado, sua conexão será encerrada.\nPressione enter para sair.");
                 broadcast(string("server"), id);
                 broadcast(channel_closed_message, id);
                 encerraCanal(it->channel);
-            } else {
-                cout << "Encerrando conexão com " << it->name << endl;
-                messageToUser(string("server"), id);
-                messageToUser(string("#closeconnection"), id);
             }
             lock_guard<mutex> guard(clients_mtx);
             it->th.detach();

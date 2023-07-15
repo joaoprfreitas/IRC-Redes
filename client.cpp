@@ -7,6 +7,7 @@
 #include <thread>
 #include <vector>
 #include <cmath>
+#include <atomic>
 
 using namespace std;
 
@@ -14,7 +15,8 @@ using namespace std;
 #define PORT 6000
 #define MAX_NAME 50
 
-bool flagSaida = false;
+// bool flagSaida = false;
+atomic<bool> flagSaida(false);
 int socketCliente;
 thread tEnviar, tReceber;
 
@@ -51,7 +53,7 @@ int main() {
 	signal(SIGINT, tratarControlC); // Captura do ctrl + c
 
 	// Conecta ao servidor
-    if ((connect(socketCliente, (struct sockaddr *)&client, sizeof(struct sockaddr_in))) == -1) {
+	if ((connect(socketCliente, (struct sockaddr *)&client, sizeof(struct sockaddr_in))) == -1) {
 		cout << "[Error] Bind falhou, tente novamente!" << endl;
 		return EXIT_FAILURE;
 	}
@@ -110,6 +112,8 @@ int main() {
 				}
 			}
 
+			cout << "==== Bem vindo ao canal " << channel << " ====" << endl;
+
 			size_t nameSize = name.size();
 			send(socketCliente, &nameSize, sizeof(nameSize), 0); // Envia o tamanho do nome
 			send(socketCliente, name.c_str(), nameSize, 0); // Envia o nome
@@ -128,10 +132,7 @@ int main() {
 			tReceber = move(t2);
 
 			if (tEnviar.joinable()) tEnviar.join();
-			cout << "Tenviar fechou" << endl;
 			if (tReceber.joinable()) tReceber.join();
-			cout << "Treceber fechou" << endl;
-			
 		} else {
 			cout << "Comando inválido, tente novamente!" << endl;
 		}
@@ -168,16 +169,17 @@ vector<char *> comporBlocos(string msg) {
 
 // Envia as mensagens do cliente para o servidor por meio do socket
 void enviarMensagem(int socketCliente) {
-    while(true) {
+    while(!flagSaida) {
         cout << "Voce: ";
 		string msg;
 		getline(cin, msg, '\n');
 
-		// Em caso de quit ou ctrl + d, encerra o chat
-		if (msg == "/quit" || cin.eof()) {
+		// Em caso de quit, ctrl + d ou canal encerrado pelo server, encerra o chat
+		if (msg == "/quit" || cin.eof() || flagSaida) {
 			send(socketCliente, "/quit", 5, 0);
-			flagSaida = true; // tava false
+			flagSaida = true;
 			tEnviar.detach();
+			tReceber.detach();
 			close(socketCliente);
 			return;
 		}
@@ -193,10 +195,7 @@ void enviarMensagem(int socketCliente) {
 
 // Recebe as mensagens do servidor
 void receberMensagem(int socketCliente) {
-    while(true) {
-        // caso nao devesse receber msg, cancela
-		if (flagSaida) return;
-
+    while(!flagSaida) {
 		char nome[MAX_MSG], str[MAX_MSG];
         
         // Recebe o nome de quem enviou a msg, verificando o tamanho
@@ -209,11 +208,9 @@ void receberMensagem(int socketCliente) {
 		recv(socketCliente, str, sizeof(str), 0);
 		apagarTexto(6); // Apaga "Voce: "
 
+		// Canal foi encerrado pelo server
 		if (strcmp(str, "#closeconnection") == 0) {
-			send(socketCliente, "/quit", 5, 0);
 			flagSaida = true;
-			tEnviar.detach();
-			close(socketCliente);
 			return;
 		}
         

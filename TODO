@@ -6,21 +6,10 @@ Modulo 2
 -- encerramento correto do servidor
 
 Modulo 3
--- sistema de canais
--- -- desbugar qnd alguem sai do servidor, o canal morre e crasha o server
--- -- comandos adm
--- -- debug pra ver se a pessoa é adm do canal msm n sendo (no server)
--- -- checar o #null
--- sistema de adm do canal
--- adm: kick, mute whois
-
--- /join
--- /nickname
 -- /whois
 -- /kick
 -- /mute
 -- /unmute
--- /ping
 
 Bonus
 -- Canais restritos apenas para convidados
