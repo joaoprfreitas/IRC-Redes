@@ -135,8 +135,8 @@ void encerraConexaoCliente(int id) {
     for (auto it = clients.begin(); it != clients.end(); it++) {
         if (it->id == id) {
             if (it->adm == true) {
-                string channel_closed_message = string("O canal ") + string(it->channel) + string(" foi encerrado, sua conexão será encerrada.\nPressione enter para sair.");
-                broadcast(string("server"), id);
+                string channel_closed_message = string("[AVISO] O canal ") + string(it->channel) + string(" foi encerrado, sua conexão será encerrada.\nPressione enter para sair.");
+                broadcast(string("#NULL"), id);
                 broadcast(channel_closed_message, id);
                 encerraCanal(it->channel);
             }
@@ -148,6 +148,27 @@ void encerraConexaoCliente(int id) {
         }
     }
 }
+
+bool isAdmin(int id, string channel) {
+    for (auto &client : clients) {
+        if (client.id == id && client.adm && client.channel == channel) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+int getClientId(string name) {
+    for (auto &client : clients) {
+        if (client.name == name) {
+            return client.id;
+        }
+    }
+
+    return -1;
+}
+
 
 // Trata as mensagens recebidas por um cliente
 void clientHandler(int client_socket, int id) {
@@ -184,7 +205,6 @@ void clientHandler(int client_socket, int id) {
     // Informa a todos que um novo cliente entrou no chat
     string welcome_message = string(name) + string(" entrou no chat!");
     broadcast("#NULL", id);
-    // broadcast(id, id);
     broadcast(welcome_message, id);
     printTerminal(welcome_message);
 
@@ -208,6 +228,42 @@ void clientHandler(int client_socket, int id) {
             messageToUser(string("server"), id);
             messageToUser(string("pong"), id);
 
+        } else if (string cmd = string(str).substr(0, 6); cmd == "/kick ") { // Cliente envia kick
+            if (!isAdmin(id, channel)) {
+                string kick_message = string("Você não tem permissão para kickar usuários!");
+                messageToUser(string("#NULL"), id);
+                messageToUser(kick_message, id);
+                continue;
+            }
+            string kickName = string(str + 6);
+
+            if (kickName == name) {
+                string kick_message = string("[ERRO] Você não pode kickar a si mesmo!");
+                messageToUser(string("#NULL"), id);
+                messageToUser(kick_message, id);
+                continue;
+            }
+
+            int kickId = getClientId(kickName);
+            if (kickId == -1) {
+                string kick_message = string("[ERRO] Usuário não encontrado!");
+                messageToUser(string("#NULL"), id);
+                messageToUser(kick_message, id);
+                continue;
+            }
+
+            string kick_message = string("[AVISO] ") + string(name) + string(" kickou ") + kickName + string(" do canal ") + string(channel) + string("!");
+            broadcast("#NULL", kickId);
+            broadcast(kick_message, kickId);
+            printTerminal(kick_message);
+
+            messageToUser(string("#NULL"), kickId);
+            messageToUser(string("[AVISO] Você foi removido do canal por um administrador, sua conexão foi encerrada.\nPressione ENTER para sair!"), kickId);
+
+            messageToUser(string("#NULL"), kickId);
+            messageToUser(string("#closeconnection"), kickId);
+
+            encerraConexaoCliente(kickId);
         } else { // Cliente envia uma mensagem
             broadcast(string(name), id);
             broadcast(string(str), id);

@@ -214,7 +214,7 @@ void receberMensagem(int socketCliente) {
 			return;
 		}
         
-        // imprime as msgs como suas ou do outro usuario 
+        // Imprime apenas o texto se for #NULL, ou nome:texto se for diferente
 		if (strcmp(nome, "#NULL") != 0)
 			cout << nome << ": " << str <<endl;
 		else
