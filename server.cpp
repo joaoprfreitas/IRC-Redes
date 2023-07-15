@@ -234,7 +234,7 @@ void clientHandler(int client_socket, int id) {
     string welcome_message = string(name) + string(" entrou no chat!");
     broadcast("#NULL", id);
     broadcast(welcome_message, id);
-    printTerminal(welcome_message);
+    printTerminal(string(name) + string(" entrou no canal ") + string(channel) + string("!"));
 
     while (true) {
         memset(str, '\0', sizeof(str));
@@ -246,7 +246,7 @@ void clientHandler(int client_socket, int id) {
             string msg = string(name) + string(" saiu do chat!");
             broadcast("#NULL", id);
             broadcast(msg, id);
-            printTerminal(msg);
+            printTerminal(string(name) + string(" saiu do canal ") + string(channel) + string("!"));
             encerraConexaoCliente(id);
             return;
 
@@ -383,7 +383,7 @@ void clientHandler(int client_socket, int id) {
 
             broadcast(string(name), id);
             broadcast(string(str), id);
-            printTerminal(name + string(": ") + str);
+            printTerminal(string("<") + string(channel) + string("> ") + name + string(": ") + str);
         }
     }
 }
