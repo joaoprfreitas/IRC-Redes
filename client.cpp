@@ -12,8 +12,9 @@ using namespace std;
 
 #define MAX_MSG 4096
 #define PORT 6000
+#define MAX_NAME 50
 
-bool flagSaida = false, inChannel = false;
+bool flagSaida = false;
 int socketCliente;
 thread tEnviar, tReceber;
 
@@ -21,7 +22,18 @@ void tratarControlC(int signal);
 void apagarTexto(int n);
 void enviarMensagem(int socketCliente);
 void receberMensagem(int socketCliente);
-bool checkChannelName(char channel[]);
+bool checkChannelName(string channel);
+
+bool checkQuit(string msg) {
+	if (msg == "/quit" || cin.eof()) {
+		cout << "Cliente encerrado!" << endl;
+		flagSaida = true;
+		close(socketCliente);
+		return true;
+	}
+
+	return false;
+}
 
 int main() {
 	// Criação do socket
@@ -36,82 +48,94 @@ int main() {
 	client.sin_addr.s_addr = INADDR_ANY;
 	bzero(&client.sin_zero, 0);
 
-	string conexao;
-	cout << "Digite /connect para se conectar ao servidor ou /quit para sair" << endl;
-	getline(cin, conexao);
+	signal(SIGINT, tratarControlC); // Captura do ctrl + c
 
-	if (conexao == "/quit" || cin.eof()) {
-		cout << "Cliente encerrado!" << endl;
-		flagSaida = true;
-		close(socketCliente);
-		return EXIT_SUCCESS;
-	}
-
-	if (conexao != "/connect") {
-		cout << "Comando inválido, cliente encerrado!" << endl;
-		flagSaida = true;
-		close(socketCliente);
-		return EXIT_SUCCESS;
-	}
-
-    // Conecta ao servidor
+	// Conecta ao servidor
     if ((connect(socketCliente, (struct sockaddr *)&client, sizeof(struct sockaddr_in))) == -1) {
 		cout << "[Error] Bind falhou, tente novamente!" << endl;
 		return EXIT_FAILURE;
 	}
 
-    signal(SIGINT, tratarControlC); // Captura do ctrl + c
+	string name, channel;
 
-	char nome[MAX_MSG], channel[MAX_MSG];
-	cout << "Digite /nickname apelidoDesejado para definir o apelido que será atribuído a você no chat ";
+	while (!flagSaida) {
+		string conexao;
+		cout << "Digite /connect para se conectar ao servidor ou /quit para sair" << endl;
+		getline(cin, conexao);
 
-    getline(cin, conexao, ' ');
-	cin.getline(nome, MAX_MSG);
+		if (checkQuit(conexao)) return EXIT_SUCCESS;
 
-    if (conexao != "/nickname") {
-        cout << "Comando inválido, cliente encerrado!" << endl;
-        flagSaida = true;
-        close(socketCliente);
-        return EXIT_SUCCESS;
-    }
+		if (conexao == "/connect") {
+			bool settedName = false;
+			bool settedChannel = false;
 
-	send(socketCliente, nome, sizeof(nome), 0); //envia uma mensagem com o nome
+			while (!settedName) {
+				cout << "Utilize /nickname NOME para definir um nome para você no chat" << endl;
+				string username;
+				getline(cin, username);
 
-    cout << "\n====== Conexão estabelecida ======   " << endl;
+				if (checkQuit(username)) return EXIT_SUCCESS;
 
-    while(!inChannel){
-        cout << "Digite /join nomeCanal para entrar no canal especificado" << endl;
+				if (username.substr(0, 10) == "/nickname ") {
+					name = username.substr(10, username.size() - 10);
 
-        getline(cin, conexao, ' ');
-        cin.getline(channel, MAX_MSG);
+					if (name.size() > MAX_NAME) {
+						cout << "O nome deve ter no máximo 50 caracteres!" << endl;
+						continue;
+					}
+					settedName = true;
+				} else {
+					cout << "Comando inválido, tente novamente!" << endl;
+				}
+			}
 
-        if (conexao != "/join") {
-            cout << "Comando inválido, cliente encerrado!" << endl;
-            flagSaida = true;
-            close(socketCliente);
-            return EXIT_SUCCESS;
-        }
+			while (!settedChannel) {
+				cout << "Utilize /join CANAL para entrar em um canal" << endl;
+				string command;
+				getline(cin, command);
 
-        if(checkChannelName(channel)){
-            send(socketCliente, channel, sizeof(channel), 0); //envia uma mensagem com o nome do canal
-            inChannel = true;
-        }
-        else
-            cout << "\nNome de canal inválido \nNomes válidos de canais começam com '&' ou '#', tem tamanho máximo de 200 caracteres e não possui ' ', '^G' ou ','" << endl;
-    }
+				if (checkQuit(command)) return EXIT_SUCCESS;
 
-	cout << "\n====== Bem vindo ao canal " << channel << " ======   " << endl;
+				if (command.substr(0, 6) == "/join ") {
+					channel = command.substr(6, command.size() - 6);
 
-	// Criação de duas threads, para realizar o recebimento e envio de msgs
-	// Coloca as threads criadas em variáveis globais
-	thread t1(enviarMensagem, socketCliente);
-	thread t2(receberMensagem, socketCliente);
+					if (!checkChannelName(channel)) {
+						cout << "Nome de canal não segue a RFC-1459!" << endl;
+						continue;
+					}
 
-	tEnviar = move(t1);
-	tReceber = move(t2);
+					settedChannel = true;
+				} else {
+					cout << "Comando inválido, tente novamente!" << endl;
+				}
+			}
 
-	if (tEnviar.joinable()) tEnviar.join();
-	if (tReceber.joinable()) tReceber.join();
+			size_t nameSize = name.size();
+			send(socketCliente, &nameSize, sizeof(nameSize), 0); // Envia o tamanho do nome
+			send(socketCliente, name.c_str(), nameSize, 0); // Envia o nome
+
+			// Enviar canal
+			size_t channelSize = channel.size();
+			send(socketCliente, &channelSize, sizeof(channelSize), 0); // Envia o tamanho da string
+			send(socketCliente, channel.c_str(), channelSize, 0); // Envia a string
+
+			// Criação de duas threads, para realizar o recebimento e envio de msgs
+			// Coloca as threads criadas em variáveis globais
+			thread t1(enviarMensagem, socketCliente);
+			thread t2(receberMensagem, socketCliente);
+
+			tEnviar = move(t1);
+			tReceber = move(t2);
+
+			if (tEnviar.joinable()) tEnviar.join();
+			cout << "Tenviar fechou" << endl;
+			if (tReceber.joinable()) tReceber.join();
+			cout << "Treceber fechou" << endl;
+			
+		} else {
+			cout << "Comando inválido, tente novamente!" << endl;
+		}
+	}
 
     return EXIT_SUCCESS;
 }
@@ -152,25 +176,11 @@ void enviarMensagem(int socketCliente) {
 		// Em caso de quit ou ctrl + d, encerra o chat
 		if (msg == "/quit" || cin.eof()) {
 			send(socketCliente, "/quit", 5, 0);
-			flagSaida = true;
-			// tReceber.detach();
+			flagSaida = true; // tava false
 			tEnviar.detach();
 			close(socketCliente);
 			return;
 		}
-
-        if(msg.substr(0, 5) == "/join"){
-            int space = msg.find(" ");
-            char channel[MAX_MSG];
-            strcpy(channel, msg.substr(space + 1).c_str());
-
-            if (checkChannelName(channel)){
-                send(socketCliente, channel, sizeof(channel), 0); //envia uma mensagem com o nome do canal
-                inChannel = true;
-            }
-            else
-                cout << "\nNome de canal inválido \nNomes válidos de canais começam com '&' ou '#', tem tamanho máximo de 200 caracteres e não possui ' ', '^G' ou ','" << endl;
-        }
 
 		// Envia a mensagem em blocos de 4kb para o servidor
 		vector<char *> blocos = comporBlocos(msg);
@@ -198,6 +208,14 @@ void receberMensagem(int socketCliente) {
         // Recebe a msg e trata ela
 		recv(socketCliente, str, sizeof(str), 0);
 		apagarTexto(6); // Apaga "Voce: "
+
+		if (strcmp(str, "#closeconnection") == 0) {
+			send(socketCliente, "/quit", 5, 0);
+			flagSaida = true;
+			tEnviar.detach();
+			close(socketCliente);
+			return;
+		}
         
         // imprime as msgs como suas ou do outro usuario 
 		if (strcmp(nome, "#NULL") != 0)
@@ -222,24 +240,16 @@ void apagarTexto(int n) {
 		cout << del;
 }
 
-bool checkChannelName(char channel[]) {
-    int length = 0;
-    while (channel[length] != '\0') {
-        if (length >= 200) {
-            return false;
-        }
-        length++;
-    }
+bool checkChannelName(string channel) {
+	if (channel.size() > 200 || channel.size() < 2)
+		return false;
 
-    if (length == 0 || (channel[0] != '&' && channel[0] != '#')) {
-        return false;
-    }
+	if (channel[0] != '&' && channel[0] != '#')
+		return false;
 
-    for (int i = 0; i < length; ++i) {
-        if (channel[i] == ' ' || channel[i] == '\a' || channel[i] == ',') {
-            return false;
-        }
-    }
+	for (int i = 0; i < channel.size(); i++)
+		if (channel[i] == ' ' || channel[i] == '\a' || channel[i] == ',')
+			return false;
 
     return true;
 }

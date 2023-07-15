@@ -20,14 +20,16 @@ struct client {
 	thread th;
 
     string channel;
-    bool adm;
-    bool mute;
+    bool adm = false;
+    bool mute = false;
 };
 
 int numClients = 0;
 vector<client> clients;
 mutex clients_mtx, cout_mtx;
 vector<string> channels;
+
+void encerraConexaoCliente(int id);
 
 // Atribui um nome a um cliente com base no seu id
 void setClientName(int clientId, char name[]) {
@@ -40,23 +42,36 @@ void setClientName(int clientId, char name[]) {
 }
 
 bool channelExists(char channel[]) {
-    
-    return (find(channels.begin(), channels.end(), channel) != channels.end());
+    for (auto &chan : channels)
+        if (chan == string(channel))
+            return true;
+
+    return false;
 }
 
-void createChannel(int sender_id, char channel[]){
+void createChannel(int sender_id, char channel[]) {
     channels.push_back(channel);
 
     for (auto &client : clients) {
         if (client.id == sender_id) {
+            client.channel = string(channel);
             client.adm = true;
+
+            cout << client.name << " criou o canal " << client.channel << endl;
+
             break;
         }
     }
 }
 
-void encerraCanal(string channel){
-    auto it = find(channels.begin(),channels.end(), channel);
+void encerraCanal(string channel) {
+    auto it = find(channels.begin(), channels.end(), channel);
+
+    for (auto &client : clients) {
+        if (client.channel == channel && !client.adm) {
+            encerraConexaoCliente(client.id);
+        }
+    }
 
     channels.erase(it);
 }
@@ -66,6 +81,7 @@ void setChannel(int clientId, char channel[]) {
     for (auto &client : clients) {
         if (client.id == clientId) {
             client.channel = string(channel);
+            client.adm = false;
             break;
         }
     }
@@ -123,10 +139,15 @@ void printTerminal(string str, bool endline = true) {
 void encerraConexaoCliente(int id) {
     for (auto it = clients.begin(); it != clients.end(); it++) {
         if (it->id == id) {
-            if (it->adm = true) {
-                string channel_closed_message = string(it->channel) + string(" foi encerrado, selecione um novo canal utilizando o comando /join novamente");
+            if (it->adm == true) {
+                string channel_closed_message = string("O canal ") + string(it->channel) + string(" foi encerrado, sua conexão será encerrada.");
+                broadcast(string("server"), id);
                 broadcast(channel_closed_message, id);
                 encerraCanal(it->channel);
+            } else {
+                cout << "Encerrando conexão com " << it->name << endl;
+                messageToUser(string("server"), id);
+                messageToUser(string("#closeconnection"), id);
             }
             lock_guard<mutex> guard(clients_mtx);
             it->th.detach();
@@ -141,16 +162,31 @@ void encerraConexaoCliente(int id) {
 void clientHandler(int client_socket, int id) {
     char name[MAX_LEN], str[MAX_LEN + 1], channel[MAX_LEN];
 
-    // Recebe o nome do cliente e altera no vetor de clientes
-    recv(client_socket, name, sizeof(name), 0);
-    setClientName(id, name);
+    // Recebe o tamanho do nome e o nome
+    size_t nameSize;
+    recv(client_socket, &nameSize, sizeof(nameSize), 0);
+    vector<char> nameBuffer(nameSize + 1); // +1 para o caractere nulo
+    recv(client_socket, nameBuffer.data(), nameSize, 0);
+    nameBuffer[nameSize] = '\0'; // Adiciona o caractere nulo no final
+    for (int i = 0; i < nameSize; i++) {
+        name[i] = nameBuffer[i];
+    }
 
-    // Recebe o nome do canal
-    recv(client_socket, channel, sizeof(channel), 0);
+    // Recebe o tamanho do nome do canal e o nome do canal
+    size_t channelSize;
+    recv(client_socket, &channelSize, sizeof(channelSize), 0);
+    vector<char> channelBuffer(channelSize + 1); // +1 para o caractere nulo
+    recv(client_socket, channelBuffer.data(), channelSize, 0);
+    channelBuffer[channelSize] = '\0'; // Adiciona o caractere nulo no final
+    for (int i = 0; i < channelSize; i++) {
+        channel[i] = channelBuffer[i];
+    }
+
+    setClientName(id, name);
     
-    if(channelExists)
+    if (channelExists(channel)) {
         setChannel(id, channel);
-    else{
+    } else{
         createChannel(id, channel);
     }
 
