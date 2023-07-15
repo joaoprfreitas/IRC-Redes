@@ -70,7 +70,6 @@ void encerraCanal(string channel) {
 
     for (auto &client : clients) {
         if (client.channel == channel && !client.adm) {
-            cout << "Servidor encerrando canal de " << client.name << endl;
             messageToUser(string("server"), client.id);
             messageToUser(string("#closeconnection"), client.id);
         }
@@ -138,6 +137,7 @@ void encerraConexaoCliente(int id) {
                 string channel_closed_message = string("[AVISO] O canal ") + string(it->channel) + string(" foi encerrado, sua conexão será encerrada.\nPressione enter para sair.");
                 broadcast(string("#NULL"), id);
                 broadcast(channel_closed_message, id);
+                printTerminal(string("[AVISO] O canal ") + string(it->channel) + string(" foi encerrado."));
                 encerraCanal(it->channel);
             }
             lock_guard<mutex> guard(clients_mtx);
@@ -167,6 +167,34 @@ int getClientId(string name) {
     }
 
     return -1;
+}
+
+void setMute(int id, string channel) {
+    for (auto &client : clients) {
+        if (client.id == id && client.channel == channel) {
+            client.mute = true;
+            break;
+        }
+    }
+}
+
+void setUnmute(int id, string channel) {
+    for (auto &client : clients) {
+        if (client.id == id && client.channel == channel) {
+            client.mute = false;
+            break;
+        }
+    }
+}
+
+bool isMuted(int id, string channel) {
+    for (auto &client : clients) {
+        if (client.id == id && client.channel == channel) {
+            return client.mute;
+        }
+    }
+
+    return false;
 }
 
 
@@ -230,32 +258,32 @@ void clientHandler(int client_socket, int id) {
 
         } else if (string cmd = string(str).substr(0, 6); cmd == "/kick ") { // Cliente envia kick
             if (!isAdmin(id, channel)) {
-                string kick_message = string("Você não tem permissão para kickar usuários!");
+                string kickMessage = string("Você não tem permissão para kickar usuários!");
                 messageToUser(string("#NULL"), id);
-                messageToUser(kick_message, id);
+                messageToUser(kickMessage, id);
                 continue;
             }
             string kickName = string(str + 6);
 
             if (kickName == name) {
-                string kick_message = string("[ERRO] Você não pode kickar a si mesmo!");
+                string kickMessage = string("[ERRO] Você não pode kickar a si mesmo!");
                 messageToUser(string("#NULL"), id);
-                messageToUser(kick_message, id);
+                messageToUser(kickMessage, id);
                 continue;
             }
 
             int kickId = getClientId(kickName);
             if (kickId == -1) {
-                string kick_message = string("[ERRO] Usuário não encontrado!");
+                string kickMessage = string("[ERRO] Usuário não encontrado!");
                 messageToUser(string("#NULL"), id);
-                messageToUser(kick_message, id);
+                messageToUser(kickMessage, id);
                 continue;
             }
 
-            string kick_message = string("[AVISO] ") + string(name) + string(" kickou ") + kickName + string(" do canal ") + string(channel) + string("!");
+            string kickMessage = string("[AVISO] ") + string(name) + string(" kickou ") + kickName + string(" do canal ") + string(channel) + string("!");
             broadcast("#NULL", kickId);
-            broadcast(kick_message, kickId);
-            printTerminal(kick_message);
+            broadcast(kickMessage, kickId);
+            printTerminal(kickMessage);
 
             messageToUser(string("#NULL"), kickId);
             messageToUser(string("[AVISO] Você foi removido do canal por um administrador, sua conexão foi encerrada.\nPressione ENTER para sair!"), kickId);
@@ -264,7 +292,95 @@ void clientHandler(int client_socket, int id) {
             messageToUser(string("#closeconnection"), kickId);
 
             encerraConexaoCliente(kickId);
+        } else if (string cmd = string(str).substr(0, 6); cmd == "/mute ") { // Cliente envia mute
+            if (!isAdmin(id, channel)) {
+                string muteMessage = string("Você não tem permissão para mutar usuários!");
+                messageToUser(string("#NULL"), id);
+                messageToUser(muteMessage, id);
+                continue;
+            }
+            string muteName = string(str + 6);
+
+            if (muteName == name) {
+                string muteMessage = string("[ERRO] Você não pode mutar a si mesmo!");
+                messageToUser(string("#NULL"), id);
+                messageToUser(muteMessage, id);
+                continue;
+            }
+
+            int muteId = getClientId(muteName);
+            if (muteId == -1) {
+                string muteMessage = string("[ERRO] Usuário não encontrado!");
+                messageToUser(string("#NULL"), id);
+                messageToUser(muteMessage, id);
+                continue;
+            }
+
+            if (isMuted(muteId, channel)) {
+                string muteMessage = string("[ERRO] Usuário já está mutado!");
+                messageToUser(string("#NULL"), id);
+                messageToUser(muteMessage, id);
+                continue;
+            }
+
+            string muteMessage = string("[AVISO] ") + string(name) + string(" mutou ") + muteName + string(" no canal ") + string(channel) + string("!");
+            broadcast("#NULL", muteId);
+            broadcast(muteMessage, muteId);
+            printTerminal(muteMessage);
+
+            messageToUser(string("#NULL"), muteId);
+            messageToUser(string("[AVISO] Você foi mutado neste canal por um administrador!"), muteId);
+
+            setMute(muteId, channel);
+        } else if (string cmd = string(str).substr(0, 8); cmd == "/unmute ") { // Cliente envia unmute
+            if (!isAdmin(id, channel)) {
+                string unmuteMessage = string("Você não tem permissão para desmutar usuários!");
+                messageToUser(string("#NULL"), id);
+                messageToUser(unmuteMessage, id);
+                continue;
+            }
+            string unmuteName = string(str + 8);
+
+            if (unmuteName == name) {
+                string unmuteMessage = string("[ERRO] Você não pode desmutar a si mesmo!");
+                messageToUser(string("#NULL"), id);
+                messageToUser(unmuteMessage, id);
+                continue;
+            }
+
+            int muteId = getClientId(unmuteName);
+            if (muteId == -1) {
+                string unmuteMessage = string("[ERRO] Usuário não encontrado!");
+                messageToUser(string("#NULL"), id);
+                messageToUser(unmuteMessage, id);
+                continue;
+            }
+
+            if (!isMuted(muteId, channel)) {
+                string unmuteMessage = string("[ERRO] Usuário não está mutado!");
+                messageToUser(string("#NULL"), id);
+                messageToUser(unmuteMessage, id);
+                continue;
+            }
+
+            string unmuteMessage = string("[AVISO] ") + string(name) + string(" desmutou ") + unmuteName + string(" no canal ") + string(channel) + string("!");
+            broadcast("#NULL", muteId);
+            broadcast(unmuteMessage, muteId);
+            printTerminal(unmuteMessage);
+
+            messageToUser(string("#NULL"), muteId);
+            messageToUser(string("[AVISO] Você foi desmutado deste canal por um administrador!"), muteId);
+
+            setUnmute(muteId, channel);
         } else { // Cliente envia uma mensagem
+            // Verifica se o cliente está mutado
+            if (isMuted(id, channel)) {
+                string muteMessage = string("[ERRO] Você está mutado neste canal!");
+                messageToUser(string("#NULL"), id);
+                messageToUser(muteMessage, id);
+                continue;
+            }
+
             broadcast(string(name), id);
             broadcast(string(str), id);
             printTerminal(name + string(": ") + str);
