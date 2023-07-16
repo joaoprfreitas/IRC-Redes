@@ -15,7 +15,6 @@ using namespace std;
 #define PORT 6000
 #define MAX_NAME 50
 
-// bool flagSaida = false;
 atomic<bool> flagSaida(false);
 int socketCliente;
 thread tEnviar, tReceber;
