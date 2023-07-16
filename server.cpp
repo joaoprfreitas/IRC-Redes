@@ -238,7 +238,7 @@ void encerraConexaoCliente(int id) {
         if (it->id == id) {
             // Se for um administrador, encerra o canal
             if (it->adm == true) {
-                string channel_closed_message = string("[AVISO] O canal ") + string(it->channel) + string(" foi encerrado, sua conexão será encerrada.\nPressione enter para sair.");
+                string channel_closed_message = string("[AVISO] O canal ") + string(it->channel) + string(" foi encerrado, sua conexão será encerrada.\nPressione ENTER para sair.");
                 broadcast(string("#NULL"), id);
                 broadcast(channel_closed_message, id);
                 printTerminal(string("O canal ") + string(it->channel) + string(" foi encerrado."));
@@ -345,8 +345,6 @@ void clientHandler(int client_socket, int id) {
     while (true) {
         memset(str, '\0', sizeof(str));
         int bytes_recv = recv(client_socket, str, sizeof(str), 0);
-
-        cout << "Bytes recebidos: " << bytes_recv << endl;
 
         if (bytes_recv <= 0) return;
         
