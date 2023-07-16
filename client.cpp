@@ -30,7 +30,7 @@ bool checkChannelName(string channel);
 int main() {
 	// Criação do socket
     if ((socketCliente = socket(AF_INET,SOCK_STREAM, 0)) == -1) {
-		cout << "[Error] Erro na criação do socket, tente novamente!" << endl;
+		cerr << "[Error] Erro na criação do socket, tente novamente!" << endl;
 		return EXIT_FAILURE;
 	}
 	
@@ -44,7 +44,7 @@ int main() {
 
 	// Conecta ao servidor
 	if ((connect(socketCliente, (struct sockaddr *)&client, sizeof(struct sockaddr_in))) == -1) {
-		cout << "[Error] Bind falhou, tente novamente!" << endl;
+		cerr << "[Error] Bind falhou, tente novamente!" << endl;
 		return EXIT_FAILURE;
 	}
 

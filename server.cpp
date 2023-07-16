@@ -52,7 +52,7 @@ void clientHandler(int client_socket, int id);
 int main() {
     int serverSocket;
     if ((serverSocket = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
-        cout << "[Error] Erro na criação do socket, tente novamente!" << endl;
+        cerr << "[Error] Erro na criação do socket, tente novamente!" << endl;
         return EXIT_FAILURE;
     }
 
@@ -63,12 +63,12 @@ int main() {
     bzero(&server.sin_zero, 0);
 
     if ((bind(serverSocket, (struct sockaddr *)&server, sizeof(struct sockaddr_in))) == -1) {
-        cout << "[Error] Bind falhou, tente novamente!" << endl;
+        cerr << "[Error] Bind falhou, tente novamente!" << endl;
         return EXIT_FAILURE;
     }
 
     if ((listen(serverSocket, 8)) == -1) {
-        cout << "[Error] Listener da porta falhou, tente novamente!" << endl;
+        cerr << "[Error] Listener da porta falhou, tente novamente!" << endl;
         return EXIT_FAILURE;
     }
     
@@ -81,19 +81,18 @@ int main() {
     while (true) {
         char clientIP[INET_ADDRSTRLEN];
         if ((clientSocket = accept(serverSocket, (struct sockaddr *)&client, &len)) == -1) {
-            cout << "[Error] Erro ao se conectar com cliente, tente novamente!" << endl;
+            cerr << "[Error] Erro ao se conectar com cliente, tente novamente!" << endl;
             return EXIT_FAILURE;
         }
 
         if (inet_ntop(AF_INET, &(client.sin_addr), clientIP, INET_ADDRSTRLEN) == NULL) {
-            std::cerr << "Erro ao obter o endereço IP do cliente." << std::endl;
+            cerr << "[Error] Erro ao obter o endereço IP do cliente." << endl;
             return EXIT_FAILURE;
         }
 
         numClients++; // id do proximo cliente
         thread t(clientHandler, clientSocket, numClients); // cria uma thread para tratar o cliente
         lock_guard<mutex> guard(clients_mtx); // cria um mutex para o cliente acessar o terminal
-
 
         clients.push_back(
             {numClients, 
@@ -248,8 +247,8 @@ void encerraConexaoCliente(int id) {
 
             lock_guard<mutex> guard(clients_mtx);
             it->th.detach();
-            clients.erase(it);
             close(it->socket);
+            clients.erase(it);
             break;
         }
     }
@@ -346,6 +345,9 @@ void clientHandler(int client_socket, int id) {
     while (true) {
         memset(str, '\0', sizeof(str));
         int bytes_recv = recv(client_socket, str, sizeof(str), 0);
+
+        cout << "Bytes recebidos: " << bytes_recv << endl;
+
         if (bytes_recv <= 0) return;
         
         // Se o cliente deseja sair do chat, encerra sua conexão
@@ -500,7 +502,7 @@ void clientHandler(int client_socket, int id) {
             }
             string whoisName = string(str + 7);
 
-            // Se o cliente tentar desmutar um usuário que não existe, envia mensagem de erro
+            // Se o cliente tentar obter o ip de um usuário que não existe, envia mensagem de erro
             int whoisId = getClientId(whoisName);
             if (whoisId == -1) {
                 string whoisMessage = string("[ERRO] Usuário não encontrado!");
@@ -508,7 +510,6 @@ void clientHandler(int client_socket, int id) {
                 messageToUser(whoisMessage, id);
                 continue;
             }
-
 
             string whoisMessage = string("[AVISO] ") + string(name) + string(" obteve o ip de ") + whoisName + string("!");
             printTerminal(whoisMessage);
