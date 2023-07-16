@@ -28,7 +28,7 @@ bool checkChannelName(string channel);
 
 int main() {
 	// Criação do socket
-    if ((socketCliente = socket(AF_INET,SOCK_STREAM, 0)) == -1) {
+    if ((socketCliente = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
 		cerr << "[Error] Erro na criação do socket, tente novamente!" << endl;
 		return EXIT_FAILURE;
 	}
