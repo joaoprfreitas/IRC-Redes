@@ -1,13 +1,2 @@
-Modulo 1
--- ver pq bloco max (string) n passa de 4095
-
-Modulo 2
--- checar se clientes receberam as msgs, se não, reenviar. após 5 falhas, desconectar
--- encerramento correto do servidor
-
 Modulo 3
--- /whois
 -- um canal X é fechado, o outro canal para de funcionar
-
-Bonus
--- Canais restritos apenas para convidados

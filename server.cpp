@@ -7,6 +7,7 @@
 #include <mutex>
 #include <vector>
 #include <algorithm>
+#include <arpa/inet.h>
 
 using namespace std;
 
@@ -19,6 +20,8 @@ struct client {
 	int socket;
 	thread th;
 
+    string ip;
+
     string channel;
     bool adm = false;
     bool mute = false;
@@ -29,6 +32,7 @@ vector<client> clients;
 vector<string> channels;
 mutex clients_mtx, cout_mtx;
 
+string getClientIp(int id);
 void setClientName(int clientId, char name[]);
 bool channelExists(char channel[]);
 void createChannel(int sender_id, char channel[]);
@@ -75,15 +79,32 @@ int main() {
     cout << "==== Log do servidor ====" << endl;
 
     while (true) {
+        char clientIP[INET_ADDRSTRLEN];
         if ((clientSocket = accept(serverSocket, (struct sockaddr *)&client, &len)) == -1) {
             cout << "[Error] Erro ao se conectar com cliente, tente novamente!" << endl;
+            return EXIT_FAILURE;
+        }
+
+        if (inet_ntop(AF_INET, &(client.sin_addr), clientIP, INET_ADDRSTRLEN) == NULL) {
+            std::cerr << "Erro ao obter o endereço IP do cliente." << std::endl;
             return EXIT_FAILURE;
         }
 
         numClients++; // id do proximo cliente
         thread t(clientHandler, clientSocket, numClients); // cria uma thread para tratar o cliente
         lock_guard<mutex> guard(clients_mtx); // cria um mutex para o cliente acessar o terminal
-        clients.push_back({numClients, string("Anon"), clientSocket, (move(t)), string(""), false, false}); // adiciona o cliente ao vetor de clientes
+
+
+        clients.push_back(
+            {numClients, 
+            string("Anon"), 
+            clientSocket, 
+            (move(t)),
+            string(clientIP),
+            string(""), 
+            false, 
+            false}
+        ); // adiciona o cliente ao vetor de clientes
     }
  
     // Espera todas as threads terminarem
@@ -94,6 +115,15 @@ int main() {
     close(serverSocket);
 
     return EXIT_SUCCESS;
+}
+
+// Retorna o ip de um cliente com base no seu id
+string getClientIp(int id) {
+    for (auto &client : clients)
+        if (client.id == id)
+            return client.ip;
+
+    return string("");
 }
 
 // Atribui um nome a um cliente com base no seu id
@@ -460,6 +490,33 @@ void clientHandler(int client_socket, int id) {
             messageToUser(string("[AVISO] Você foi desmutado deste canal por um administrador!"), muteId);
 
             setUnmute(muteId, channel);
+        } else if (string cmd = string(str).substr(0, 7); cmd == "/whois ") { // Cliente envia whois
+            // Se o cliente não for administrador, envia mensagem de erro
+            if (!isAdmin(id, channel)) {
+                string whoisMessage = string("Você não tem permissão para usar o comando /whois!");
+                messageToUser(string("#NULL"), id);
+                messageToUser(whoisMessage, id);
+                continue;
+            }
+            string whoisName = string(str + 7);
+
+            // Se o cliente tentar desmutar um usuário que não existe, envia mensagem de erro
+            int whoisId = getClientId(whoisName);
+            if (whoisId == -1) {
+                string whoisMessage = string("[ERRO] Usuário não encontrado!");
+                messageToUser(string("#NULL"), id);
+                messageToUser(whoisMessage, id);
+                continue;
+            }
+
+
+            string whoisMessage = string("[AVISO] ") + string(name) + string(" obteve o ip de ") + whoisName + string("!");
+            printTerminal(whoisMessage);
+
+            string ip = getClientIp(whoisId);
+
+            messageToUser(string("#NULL"), id);
+            messageToUser(string("[AVISO] O IP de ") + string(whoisName) + string(" é ") + ip, id);
         } else { // Cliente envia uma mensagem
             // Verifica se o cliente está mutado
             if (isMuted(id, channel)) {
