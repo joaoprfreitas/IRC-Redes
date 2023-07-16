@@ -20,22 +20,12 @@ atomic<bool> flagSaida(false);
 int socketCliente;
 thread tEnviar, tReceber;
 
+bool checkQuit(string msg);
 void tratarControlC(int signal);
 void apagarTexto(int n);
 void enviarMensagem(int socketCliente);
 void receberMensagem(int socketCliente);
 bool checkChannelName(string channel);
-
-bool checkQuit(string msg) {
-	if (msg == "/quit" || cin.eof()) {
-		cout << "Cliente encerrado!" << endl;
-		flagSaida = true;
-		close(socketCliente);
-		return true;
-	}
-
-	return false;
-}
 
 int main() {
 	// Criação do socket
@@ -67,10 +57,12 @@ int main() {
 
 		if (checkQuit(conexao)) return EXIT_SUCCESS;
 
+		// Se digitar /connect, o cliente deve se conectar ao servidor
 		if (conexao == "/connect") {
 			bool settedName = false;
 			bool settedChannel = false;
 
+			// Enquanto o nome não for definido, o cliente deve digitar /nickname NOME
 			while (!settedName) {
 				cout << "Utilize /nickname NOME para definir um nome para você no chat" << endl;
 				string username;
@@ -78,6 +70,7 @@ int main() {
 
 				if (checkQuit(username)) return EXIT_SUCCESS;
 
+				// Valida o nome
 				if (username.substr(0, 10) == "/nickname ") {
 					name = username.substr(10, username.size() - 10);
 
@@ -91,6 +84,7 @@ int main() {
 				}
 			}
 
+			// Enquanto o canal não for definido, o cliente deve digitar /join CANAL
 			while (!settedChannel) {
 				cout << "Utilize /join CANAL para entrar em um canal" << endl;
 				string command;
@@ -98,6 +92,7 @@ int main() {
 
 				if (checkQuit(command)) return EXIT_SUCCESS;
 
+				// Valida o nome do canal
 				if (command.substr(0, 6) == "/join ") {
 					channel = command.substr(6, command.size() - 6);
 
@@ -114,11 +109,12 @@ int main() {
 
 			cout << "==== Bem vindo ao canal " << channel << " ====" << endl;
 
+			// Envia o nome do cliente ao servidor
 			size_t nameSize = name.size();
 			send(socketCliente, &nameSize, sizeof(nameSize), 0); // Envia o tamanho do nome
 			send(socketCliente, name.c_str(), nameSize, 0); // Envia o nome
 
-			// Enviar canal
+			// Envia o nome do canal ao servidor
 			size_t channelSize = channel.size();
 			send(socketCliente, &channelSize, sizeof(channelSize), 0); // Envia o tamanho da string
 			send(socketCliente, channel.c_str(), channelSize, 0); // Envia a string
@@ -131,6 +127,7 @@ int main() {
 			tEnviar = move(t1);
 			tReceber = move(t2);
 
+			// Espera as threads terminarem
 			if (tEnviar.joinable()) tEnviar.join();
 			if (tReceber.joinable()) tReceber.join();
 		} else {
@@ -190,6 +187,7 @@ void enviarMensagem(int socketCliente) {
 		for (char *bloco : blocos) {
 			send(socketCliente, bloco, strlen(bloco), 0);
 		}
+		
     }
 }
 
@@ -214,7 +212,7 @@ void receberMensagem(int socketCliente) {
 			return;
 		}
         
-        // Imprime apenas o texto se for #NULL, ou nome:texto se for diferente
+        // Imprime apenas o str se for #NULL, ou nome:texto se for diferente
 		if (strcmp(nome, "#NULL") != 0)
 			cout << nome << ": " << str <<endl;
 		else
@@ -237,6 +235,7 @@ void apagarTexto(int n) {
 		cout << del;
 }
 
+// Verifica se o nome do canal segue a RFC-1459
 bool checkChannelName(string channel) {
 	if (channel.size() > 200 || channel.size() < 2)
 		return false;
@@ -249,4 +248,16 @@ bool checkChannelName(string channel) {
 			return false;
 
     return true;
+}
+
+// Verifica se o cliente digitou /quit ou ctrl + d
+bool checkQuit(string msg) {
+	if (msg == "/quit" || cin.eof()) {
+		cout << "Cliente encerrado!" << endl;
+		flagSaida = true;
+		close(socketCliente);
+		return true;
+	}
+
+	return false;
 }

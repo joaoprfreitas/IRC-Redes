@@ -26,11 +26,75 @@ struct client {
 
 int numClients = 0;
 vector<client> clients;
-mutex clients_mtx, cout_mtx;
 vector<string> channels;
+mutex clients_mtx, cout_mtx;
 
-void encerraConexaoCliente(int id);
+void setClientName(int clientId, char name[]);
+bool channelExists(char channel[]);
+void createChannel(int sender_id, char channel[]);
+void encerraCanal(string channel);
+void setChannel(int clientId, char channel[]);
 void messageToUser(string msg, int clientId);
+void broadcast(string msg, int sender_id);
+void printTerminal(string str, bool endline);
+void encerraConexaoCliente(int id);
+bool isAdmin(int id, string channel);
+int getClientId(string name);
+void setMute(int id, string channel);
+void setUnmute(int id, string channel);
+bool isMuted(int id, string channel);
+void clientHandler(int client_socket, int id);
+
+int main() {
+    int serverSocket;
+    if ((serverSocket = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
+        cout << "[Error] Erro na criação do socket, tente novamente!" << endl;
+        return EXIT_FAILURE;
+    }
+
+    struct sockaddr_in server;
+    server.sin_family = AF_INET;
+    server.sin_port = htons(PORT);
+    server.sin_addr.s_addr = INADDR_ANY;
+    bzero(&server.sin_zero, 0);
+
+    if ((bind(serverSocket, (struct sockaddr *)&server, sizeof(struct sockaddr_in))) == -1) {
+        cout << "[Error] Bind falhou, tente novamente!" << endl;
+        return EXIT_FAILURE;
+    }
+
+    if ((listen(serverSocket, 8)) == -1) {
+        cout << "[Error] Listener da porta falhou, tente novamente!" << endl;
+        return EXIT_FAILURE;
+    }
+    
+    int clientSocket;
+    struct sockaddr_in client;
+    unsigned int len = sizeof(sockaddr_in);
+
+    cout << "==== Log do servidor ====" << endl;
+
+    while (true) {
+        if ((clientSocket = accept(serverSocket, (struct sockaddr *)&client, &len)) == -1) {
+            cout << "[Error] Erro ao se conectar com cliente, tente novamente!" << endl;
+            return EXIT_FAILURE;
+        }
+
+        numClients++; // id do proximo cliente
+        thread t(clientHandler, clientSocket, numClients); // cria uma thread para tratar o cliente
+        lock_guard<mutex> guard(clients_mtx); // cria um mutex para o cliente acessar o terminal
+        clients.push_back({numClients, string("Anon"), clientSocket, (move(t)), string(""), false, false}); // adiciona o cliente ao vetor de clientes
+    }
+ 
+    // Espera todas as threads terminarem
+    for (auto &client : clients) {
+        client.th.join();
+    }
+
+    close(serverSocket);
+
+    return EXIT_SUCCESS;
+}
 
 // Atribui um nome a um cliente com base no seu id
 void setClientName(int clientId, char name[]) {
@@ -42,6 +106,7 @@ void setClientName(int clientId, char name[]) {
     }
 }
 
+// Verifica se um canal existe
 bool channelExists(char channel[]) {
     for (auto &chan : channels)
         if (chan == string(channel))
@@ -50,6 +115,7 @@ bool channelExists(char channel[]) {
     return false;
 }
 
+// Cria um novo canal
 void createChannel(int sender_id, char channel[]) {
     channels.push_back(channel);
 
@@ -65,14 +131,22 @@ void createChannel(int sender_id, char channel[]) {
     }
 }
 
+// Fecha um canal existente
 void encerraCanal(string channel) {
     auto it = find(channels.begin(), channels.end(), channel);
 
+    vector<int> aux;
+
     for (auto &client : clients) {
         if (client.channel == channel && !client.adm) {
-            messageToUser(string("server"), client.id);
+            messageToUser(string("#NULL"), client.id);
             messageToUser(string("#closeconnection"), client.id);
+            aux.insert(aux.end(), client.id);
         }
+    }
+
+    for (auto &id : aux) {
+        encerraConexaoCliente(id);
     }
 
     channels.erase(it);
@@ -115,11 +189,11 @@ void broadcast(string msg, int sender_id) {
         }
     }
 
-    for (auto &client : clients) {
-        if (client.id != sender_id && client.channel == channel) {
+    // Envia a msg para todos os clientes do canal do sender
+    for (auto &client : clients)
+        if (client.id != sender_id && client.channel == channel)
             send(client.socket, tmp, sizeof(tmp), 0);
-        }
-    }
+
 }
 
 // Imprime uma msg no terminal do servidor, controlando race condition
@@ -133,13 +207,15 @@ void printTerminal(string str, bool endline = true) {
 void encerraConexaoCliente(int id) {
     for (auto it = clients.begin(); it != clients.end(); it++) {
         if (it->id == id) {
+            // Se for um administrador, encerra o canal
             if (it->adm == true) {
                 string channel_closed_message = string("[AVISO] O canal ") + string(it->channel) + string(" foi encerrado, sua conexão será encerrada.\nPressione enter para sair.");
                 broadcast(string("#NULL"), id);
                 broadcast(channel_closed_message, id);
-                printTerminal(string("[AVISO] O canal ") + string(it->channel) + string(" foi encerrado."));
+                printTerminal(string("O canal ") + string(it->channel) + string(" foi encerrado."));
                 encerraCanal(it->channel);
             }
+
             lock_guard<mutex> guard(clients_mtx);
             it->th.detach();
             clients.erase(it);
@@ -149,26 +225,25 @@ void encerraConexaoCliente(int id) {
     }
 }
 
+// Verifica se o cliente é administrador de um canal
 bool isAdmin(int id, string channel) {
-    for (auto &client : clients) {
-        if (client.id == id && client.adm && client.channel == channel) {
+    for (auto &client : clients)
+        if (client.id == id && client.adm && client.channel == channel)
             return true;
-        }
-    }
 
     return false;
 }
 
+// Retorna o id de um cliente com base no seu nome
 int getClientId(string name) {
-    for (auto &client : clients) {
-        if (client.name == name) {
+    for (auto &client : clients)
+        if (client.name == name)
             return client.id;
-        }
-    }
 
     return -1;
 }
 
+// Muta um client de um canal
 void setMute(int id, string channel) {
     for (auto &client : clients) {
         if (client.id == id && client.channel == channel) {
@@ -178,6 +253,7 @@ void setMute(int id, string channel) {
     }
 }
 
+// Desmuta um client de um canal
 void setUnmute(int id, string channel) {
     for (auto &client : clients) {
         if (client.id == id && client.channel == channel) {
@@ -187,22 +263,21 @@ void setUnmute(int id, string channel) {
     }
 }
 
+// Verifica se um cliente está mutado
 bool isMuted(int id, string channel) {
-    for (auto &client : clients) {
-        if (client.id == id && client.channel == channel) {
+    for (auto &client : clients)
+        if (client.id == id && client.channel == channel) 
             return client.mute;
-        }
-    }
 
     return false;
 }
 
 
-// Trata as mensagens recebidas por um cliente
+// Trata as mensagens recebidas de um cliente
 void clientHandler(int client_socket, int id) {
     char name[MAX_LEN], str[MAX_LEN + 1], channel[MAX_LEN];
 
-    // Recebe o tamanho do nome e o nome
+    // Recebe o tamanho do nome e o nome do cliente
     size_t nameSize;
     recv(client_socket, &nameSize, sizeof(nameSize), 0);
     vector<char> nameBuffer(nameSize + 1); // +1 para o caractere nulo
@@ -222,8 +297,10 @@ void clientHandler(int client_socket, int id) {
         channel[i] = channelBuffer[i];
     }
 
+    // Seta o nome do cliente
     setClientName(id, name);
     
+    // Verifica se o canal existe, se sim, o cliente entra no canal, se não, o canal é criado
     if (channelExists(channel)) {
         setChannel(id, channel);
     } else{
@@ -257,6 +334,7 @@ void clientHandler(int client_socket, int id) {
             messageToUser(string("pong"), id);
 
         } else if (string cmd = string(str).substr(0, 6); cmd == "/kick ") { // Cliente envia kick
+            // Se cliente não for administrador, envia mensagem de erro
             if (!isAdmin(id, channel)) {
                 string kickMessage = string("Você não tem permissão para kickar usuários!");
                 messageToUser(string("#NULL"), id);
@@ -265,6 +343,7 @@ void clientHandler(int client_socket, int id) {
             }
             string kickName = string(str + 6);
 
+            // Se o cliente tentar kickar a si mesmo, envia mensagem de erro
             if (kickName == name) {
                 string kickMessage = string("[ERRO] Você não pode kickar a si mesmo!");
                 messageToUser(string("#NULL"), id);
@@ -272,6 +351,7 @@ void clientHandler(int client_socket, int id) {
                 continue;
             }
 
+            // Se o cliente tentar kickar um usuário que não existe, envia mensagem de erro
             int kickId = getClientId(kickName);
             if (kickId == -1) {
                 string kickMessage = string("[ERRO] Usuário não encontrado!");
@@ -293,6 +373,7 @@ void clientHandler(int client_socket, int id) {
 
             encerraConexaoCliente(kickId);
         } else if (string cmd = string(str).substr(0, 6); cmd == "/mute ") { // Cliente envia mute
+            // Se o cliente não for administrador, envia mensagem de erro
             if (!isAdmin(id, channel)) {
                 string muteMessage = string("Você não tem permissão para mutar usuários!");
                 messageToUser(string("#NULL"), id);
@@ -301,6 +382,7 @@ void clientHandler(int client_socket, int id) {
             }
             string muteName = string(str + 6);
 
+            // Se o cliente tentar mutar a si mesmo, envia mensagem de erro
             if (muteName == name) {
                 string muteMessage = string("[ERRO] Você não pode mutar a si mesmo!");
                 messageToUser(string("#NULL"), id);
@@ -308,6 +390,7 @@ void clientHandler(int client_socket, int id) {
                 continue;
             }
 
+            // Se o cliente tentar mutar um usuário que não existe, envia mensagem de erro
             int muteId = getClientId(muteName);
             if (muteId == -1) {
                 string muteMessage = string("[ERRO] Usuário não encontrado!");
@@ -316,6 +399,7 @@ void clientHandler(int client_socket, int id) {
                 continue;
             }
 
+            // Se o usuário já estiver mutado, envia mensagem de erro
             if (isMuted(muteId, channel)) {
                 string muteMessage = string("[ERRO] Usuário já está mutado!");
                 messageToUser(string("#NULL"), id);
@@ -333,6 +417,7 @@ void clientHandler(int client_socket, int id) {
 
             setMute(muteId, channel);
         } else if (string cmd = string(str).substr(0, 8); cmd == "/unmute ") { // Cliente envia unmute
+            // Se o cliente não for administrador, envia mensagem de erro
             if (!isAdmin(id, channel)) {
                 string unmuteMessage = string("Você não tem permissão para desmutar usuários!");
                 messageToUser(string("#NULL"), id);
@@ -341,6 +426,7 @@ void clientHandler(int client_socket, int id) {
             }
             string unmuteName = string(str + 8);
 
+            // Se o cliente tentar desmutar a si mesmo, envia mensagem de erro
             if (unmuteName == name) {
                 string unmuteMessage = string("[ERRO] Você não pode desmutar a si mesmo!");
                 messageToUser(string("#NULL"), id);
@@ -348,6 +434,7 @@ void clientHandler(int client_socket, int id) {
                 continue;
             }
 
+            // Se o cliente tentar desmutar um usuário que não existe, envia mensagem de erro
             int muteId = getClientId(unmuteName);
             if (muteId == -1) {
                 string unmuteMessage = string("[ERRO] Usuário não encontrado!");
@@ -356,6 +443,7 @@ void clientHandler(int client_socket, int id) {
                 continue;
             }
 
+            // Se o usuário não estiver mutado, envia mensagem de erro
             if (!isMuted(muteId, channel)) {
                 string unmuteMessage = string("[ERRO] Usuário não está mutado!");
                 messageToUser(string("#NULL"), id);
@@ -386,55 +474,4 @@ void clientHandler(int client_socket, int id) {
             printTerminal(string("<") + string(channel) + string("> ") + name + string(": ") + str);
         }
     }
-}
-
-int main() {
-    int serverSocket;
-    if ((serverSocket = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
-        cout << "[Error] Erro na criação do socket, tente novamente!" << endl;
-        return EXIT_FAILURE;
-    }
-
-    struct sockaddr_in server;
-    server.sin_family = AF_INET;
-    server.sin_port = htons(6000);
-    server.sin_addr.s_addr = INADDR_ANY;
-    bzero(&server.sin_zero, 0);
-
-    if ((bind(serverSocket, (struct sockaddr *)&server, sizeof(struct sockaddr_in))) == -1) {
-        cout << "[Error] Bind falhou, tente novamente!" << endl;
-        return EXIT_FAILURE;
-    }
-
-    if ((listen(serverSocket, 8)) == -1) {
-        cout << "[Error] Listener da porta falhou, tente novamente!" << endl;
-        return EXIT_FAILURE;
-    }
-    
-    int clientSocket;
-    struct sockaddr_in client;
-    unsigned int len = sizeof(sockaddr_in);
-
-    cout << "==== Bem vindo ao chatroom ====" << endl;
-
-    while (true) {
-        if ((clientSocket = accept(serverSocket, (struct sockaddr *)&client, &len)) == -1) {
-            cout << "[Error] Erro ao se conectar com cliente, tente novamente!" << endl;
-            return EXIT_FAILURE;
-        }
-
-        numClients++; // id do proximo cliente
-        thread t(clientHandler, clientSocket, numClients); // cria uma thread para tratar o cliente
-        lock_guard<mutex> guard(clients_mtx); // cria um mutex para o cliente acessar o terminal
-        clients.push_back({numClients, string("Anonymous"), clientSocket, (move(t)), string(""), false, false}); // adiciona o cliente ao vetor de clientes
-    }
- 
-    // Espera todas as threads terminarem
-    for (auto &client : clients) {
-        client.th.join();
-    }
-
-    close(serverSocket);
-
-    return EXIT_SUCCESS;
 }
